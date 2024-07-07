@@ -32,9 +32,18 @@ SQLtoObsidianNote parses SQL using [sqlglot](https://github.com/tobymao/sqlglot)
 {columnname}
 ### Type:
 {columntype}
+### Table:
+{Backlink to Table}
 
 ### Constraints:
 {Bulleted List of Column Constraints, except Constraints that include other Columns within the same table}
+```
+
+### Index Page
+**File name:** *User supplied, defaults to `TableIndex.md`*
+```
+## Table Index
+{Backlinks to Tables}
 ```
 
 ## Installation
@@ -52,9 +61,12 @@ positional arguments:
   input              The input SQL file
 
 options:
-  -h, --help         show this help message and exit
-  --output OUTPUT    The output directory
-  --dialect DIALECT  The SQL dialect to use
+  -o OUTPUT, --output OUTPUT
+                        The output directory
+  -d DIALECT, --dialect DIALECT
+                        The SQL dialect to use
+  -i INDEX, --index INDEX
+                        If provided, generate an index page with the given name
 ```
 
 Lower-level usage involves `SQLtoObsidianNote.parse_sql(inputstring, dialect = dialect)` which returns a list of `TablePage` objects. While no official documentation has been generated the package is fully typed and the codebase is very small so it's a quick read.
