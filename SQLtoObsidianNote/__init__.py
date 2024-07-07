@@ -6,16 +6,19 @@ import pathlib
 import typing
 
 ## TODO: sqlite allows for rowid aliases and consequently for rowid/the rowid alias to
-##        interchangeably, which means that pages will not be correctly linked. This
-##        can be at least partially addressed by searching the rest of the schema for
-##        the rowid alias in order to link to the correct page. It is not clear if this
-##        is fixable for partial schemas.
+##        be used interchangeably, which means that pages will not be correctly linked.
+##        This can be at least partially addressed by searching the rest of the schema
+##        for the rowid alias in order to link to the correct page. It is not clear if
+##        this is fixable for partial schemas.
 
 ConstraintName = str
 ConstraintArgs = list[typing.Any]
 ColumnConstraints = list[tuple[ConstraintName,ConstraintArgs]]
 ConstraintFormatter = typing.Callable[[ConstraintName, ConstraintArgs], str]
 ConstraintLookup = dict[ConstraintName, ConstraintFormatter]
+
+TABLEDIR = "tables"
+COLUMNDIR = "columns"
 
 @dataclass
 class Page():
@@ -77,7 +80,7 @@ class TablePage(Page):
         out += "\n\n"
         out += "### Columns:\n"
         for columnname in self.columns:
-            out += f"[[{self.name}-{columnname}|{columnname}]]\n"
+            out += f"[[{COLUMNDIR}/{self.name}-{columnname}|{columnname}]]\n"
 
         out += "\n"
         out += "### Constraints:\n"
@@ -119,13 +122,14 @@ class ColumnPage(Page):
           "References": lambda name, args: f"References [[{args[0]}-{args[1]}|{args[0]}.{args[1]}]]"
         }
 
-    def stringify(self, dialect:str|None=None)->str:
+    def stringify(self, tablepage: TablePage, dialect:str|None=None)->str:
         out = ""
         for tag in self.tags:
             out += f"#{tag} "
         out += "\n\n"
         out += f"### Name:\n{self.name}\n"
         out += f"### Type:\n{self.type}\n"
+        out += f"### Table:\n [[{TABLEDIR}/{tablepage.getfilename()}|{tablepage.name}]]\n"
         out += "\n"
         out += "### Constraints:\n"
         for [constraintname, constraintargs] in self.constraints:
@@ -261,11 +265,11 @@ def write_obsidianpages(tablepages: list[TablePage], path: str|pathlib.Path, dia
     if not path.exists():
         path.mkdir(parents = True, exist_ok = True)
 
-    tablesub = path / "tables"
+    tablesub = path / TABLEDIR
     if not tablesub.exists():
         tablesub.mkdir(parents = True, exist_ok = True)
 
-    columnsub = path / "columns"
+    columnsub = path / COLUMNDIR
     if not columnsub.exists():
         columnsub.mkdir(parents = True, exist_ok = True)
 
@@ -275,7 +279,7 @@ def write_obsidianpages(tablepages: list[TablePage], path: str|pathlib.Path, dia
 
       for columnpage in tablepage.columns.values():
           with open(columnsub/columnpage.getfilename(tablepage), "w") as file:
-              file.write(columnpage.stringify(dialect=dialect))
+              file.write(columnpage.stringify(tablepage=tablepage, dialect=dialect))
 
 def parse_from_file(path: str|pathlib.Path, dialect: str|None = None) -> list[TablePage]:
     """ Reads the SQL from the file and returns the table pages
@@ -290,7 +294,7 @@ def parse_from_file(path: str|pathlib.Path, dialect: str|None = None) -> list[Ta
     with open(path, "r") as file:
         return parse_sql(file.read(), dialect=dialect)
     
-def generate_markdown_from_file(inputpath: str|pathlib.Path, outputpath: str|pathlib.Path|None, dialect: str|None = None, **opts):
+def generate_markdown_from_file(inputpath: str|pathlib.Path, outputpath: str|pathlib.Path|None, dialect: str|None = None, index: str|None = None, **opts):
     """ Generates markdown files from the SQL file
     
     Args:
@@ -307,4 +311,28 @@ def generate_markdown_from_file(inputpath: str|pathlib.Path, outputpath: str|pat
     if not outputpath.exists():
         outputpath.mkdir(parents = True, exist_ok = True)
     write_obsidianpages(tablepages, outputpath, dialect=dialect, **opts)
+
+    if index is not None:
+        generate_index_page(tablepages, outputpath, index)
     
+def generate_index_page(tablepages: list[TablePage], path: str|pathlib.Path, name: str|None = None):
+    """ Generates a markdown Index Page for the table pages
+
+    Args:
+        tablepages (list[TablePage]): The list of table pages
+        path (str|pathlib.Path): The path to write the index page to
+        name (str|None, optional): The name of the index page. Defaults to None.
+    """
+    path = pathlib.Path(path).resolve()
+    path.mkdir(parents = True, exist_ok = True)
+
+    if name is None:
+        name = "TableIndex"
+
+    target = (path / name).with_suffix(".md").resolve()
+
+    with open(target, "w") as f:
+        f.write(f"## Table Index\n")
+        
+        for tablepage in tablepages:
+            f.write(f"[[{TABLEDIR}/{tablepage.getfilename()}|{tablepage.name}]]\n")
